@@ -2,6 +2,8 @@ import maya.OpenMayaUI as omui
 from PySide2 import QtWidgets, QtCore
 from shiboken2 import wrapInstance
 
+import os
+
 import mayautils
 
 def maya_main_window():
@@ -30,7 +32,7 @@ class SmartSaveUI(QtWidgets.QDialog):
         self.title_lbl = QtWidgets.QLabel("Smart Save")
         self.title_lbl.setStyleSheet("font: bold 40px")
         self.dir_lbl = QtWidgets.QLabel("Directory")
-        self.dir_le = QtWidgets.QLineEdit()
+        self.dir_le = QtWidgets.QLineEdit(self.scene.dir())
         self.dir_le.setText(self.scene.dir)
         self.browse_btn = QtWidgets.QPushButton("Browse")
         self.descriptor_lbl = QtWidgets.QLabel("Descriptor")
@@ -86,6 +88,7 @@ class SmartSaveUI(QtWidgets.QDialog):
         self.cancel_btn.clicked.connect(self.cancel)
         self.save_btn.clicked.connect(self.save)
         self.increment_save_btn.clicked.connect(self.increment_save)
+        self.browse_btn.clicked.connect(self.browse)
 
     def _populate_scenefile_properties(self):
         """Populates the SceneFile object properties from the UI"""
@@ -99,12 +102,37 @@ class SmartSaveUI(QtWidgets.QDialog):
         """Saves the scene file"""
         self._populate_scenefile_properties()
         self.scene.save()
+        self.dir_le.setText(self.scene.dir)
+
+    @QtCore.Slot()
+    def browse(self):
+        dir = QtWidgets.QFileDialog.getExistingDirectory(self, "Open Directory",
+                                               self.scene.dir,
+                                               QtWidgets.QFileDialog.ShowDirsOnly
+                                               | QtWidgets.QFileDialog.DontResolveSymlinks)
+        self.scene.dir = dir
+        self.dir_le.setText(self.scene.dir)
+
+
 
     @QtCore.Slot()
     def increment_save(self):
         """Automatically finds the next available version on disk and saves up"""
         self._populate_scenefile_properties()
+        path = self.scene.dir
+        file_names = []
+        for dir_file in os.listdir(path):
+            if '.ma' in dir_file and self.scene.descriptor in dir_file:
+                file_names.append(dir_file)
+        max_version = max([mayautils.parse_name(file)['version'] for file in file_names])
+        self.scene.version = max_version
         self.scene.increment_and_save()
+        self.version_spinbox.setValue(self.scene.version)
+        self.dir_le.setText(self.scene.dir)
+
+
+
+
 
     @QtCore.Slot()
     def cancel(self):
